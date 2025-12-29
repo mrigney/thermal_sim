@@ -1,0 +1,67 @@
+# Desert Diurnal Cycle - Basic Example
+#
+# Simulates 24-hour diurnal thermal cycle over flat desert terrain.
+# Good starting point for learning the simulator.
+
+simulation:
+  name: "desert_diurnal_24hr"
+  start_time: "2025-06-21T06:00:00"  # Summer solstice, sunrise
+  duration_hours: 24
+  time_step: 120  # 2 minutes
+
+site:
+  latitude: 35.0    # ~New Mexico, USA
+  longitude: 106.0  # degrees West
+  altitude: 1500    # meters
+
+terrain:
+  type: "flat"
+  nx: 50
+  ny: 50
+  dx: 1.0   # 1 meter spacing
+  dy: 1.0
+  flat_elevation: 0.0
+
+materials:
+  type: "uniform"
+  default_material: "Dry Sand"  # Dry desert sand
+
+atmosphere:
+  temperature:
+    model: "diurnal"
+    mean_kelvin: 298.15      # 25°C mean
+    amplitude_kelvin: 12.0   # ±12K variation (13°C to 37°C)
+  wind:
+    model: "diurnal"
+    mean_speed: 3.0          # m/s
+    amplitude: 1.5           # m/s
+  sky_temperature_model: "idso"
+
+subsurface:
+  z_max: 0.5        # 50 cm depth
+  n_layers: 20
+  stretch_factor: 1.2
+
+solver:
+  enable_lateral_conduction: false  # 1D-only (each column independent)
+  lateral_conductivity_factor: 1.0
+  shadow_timestep_minutes: 60.0     # Shadow cache time resolution
+
+initial_conditions:
+  type: "uniform"
+  temperature_kelvin: 298.0  # Start at mean temperature
+
+output:
+  directory: "output/desert_diurnal"
+  save_interval_seconds: 1800  # Save every 30 minutes
+  save_temperature_fields: true
+  save_energy_diagnostics: true
+  checkpoint_interval_seconds: 7200  # Checkpoint every 2 hours
+
+  # Automatic visualization (optional)
+  generate_plots: true
+  plot_format: "png"  # png, pdf, or svg
+  plot_dpi: 150
+  plot_types:
+    - "surface_temperature"
+    - "diagnostics_timeseries"

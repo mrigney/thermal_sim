@@ -1,0 +1,83 @@
+# Minimal test configuration with objects
+
+simulation:
+  name: "object_test"
+  start_time: "2025-06-21T06:00:00"
+  duration_hours: 6  # 6 hour test
+  time_step: 120  # seconds
+
+site:
+  latitude: 35.0
+  longitude: -106.0
+  altitude: 1500.0
+  timezone_offset: -7.0
+
+terrain:
+  type: "flat"
+  nx: 50
+  ny: 50
+  dx: 1.0
+  dy: 1.0
+  flat_elevation: 0.0
+
+materials:
+  type: "uniform"
+  default_material: "granite"
+
+atmosphere:
+  temperature:
+    model: "diurnal"
+    mean_kelvin: 298.15
+    amplitude_kelvin: 10.0
+  wind:
+    model: "diurnal"
+    mean_speed: 3.0
+    amplitude: 1.0
+  sky_temperature_model: "idso"
+
+subsurface:
+  z_max: 0.5
+  n_layers: 20
+  stretch_factor: 1.2
+
+solver:
+  enable_lateral_conduction: false
+  lateral_conductivity_factor: 1.0
+  shadow_timestep_minutes: 60.0
+
+initial_conditions:
+  type: "uniform"
+  temperature_kelvin: 298.0
+
+output:
+  directory: "output/object_test"
+  save_interval_seconds: 3600.0
+  save_temperature_fields: true
+  save_energy_diagnostics: true
+
+# Test objects
+objects:
+  - name: "test_cube"
+    mesh_file: "examples/cube_1m.obj"
+    location: [25.0, 25.0, 0.0]
+    material: "granite"
+    thickness: 0.1
+    rotation: [0.0, 0.0, 45.0]
+    enabled: true
+    ground_clamped: true  # Auto-placed on terrain surface
+
+  - name: "test_building"
+    mesh_file: "examples/simple_building.obj"
+    location: [30.0, 30.0, 0.0]  # z-coordinate will be overridden
+    material: "granite"
+    thickness: 0.2
+    enabled: true
+    ground_clamped: true  # Automatically placed on terrain surface
+
+  - name: "disabled_box"
+    mesh_file: "examples/box_2x1x1m.obj"
+    location: [10.0, 10.0, 0.0]
+    material: "granite"
+    thickness: 0.1
+    enabled: false
+    ground_clamped: true

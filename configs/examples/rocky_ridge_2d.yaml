@@ -1,0 +1,68 @@
+# Rocky Terrain with Lateral Conduction
+#
+# Simulates thermal behavior of rocky terrain with topographic variations
+# and lateral heat flow enabled (2D+1D solver).
+
+simulation:
+  name: "rocky_terrain_with_lateral_conduction"
+  start_time: "2025-11-21T00:00:00"
+  duration_hours: 24  # 2 days
+  time_step: 120
+
+site:
+  latitude: 40.0    # ~Colorado, USA
+  longitude: 105.0  # degrees West (positive = West)
+  altitude: 2000    # meters
+  timezone_offset: -7.0  # Mountain Standard Time (MST = UTC-7)
+
+terrain:
+  type: "ridge"  # Will generate synthetic ridge
+  nx: 75
+  ny: 75
+  dx: 1.0   # 50 cm spacing (finer grid)
+  dy: 1.0
+
+materials:
+  type: "uniform"
+  default_material: "granite"  # High conductivity rock
+
+atmosphere:
+  temperature:
+    model: "diurnal"
+    mean_kelvin: 288.15      # 15°C mean (cooler, higher altitude)
+    amplitude_kelvin: 15.0   # Larger swings at altitude
+  wind:
+    model: "diurnal"
+    mean_speed: 5.0          # Windier at altitude
+    amplitude: 2.0
+  sky_temperature_model: "idso"
+
+subsurface:
+  z_max: 1.0        # Deeper (granite has larger penetration depth)
+  n_layers: 25
+  stretch_factor: 1.15
+
+solver:
+  enable_lateral_conduction: true   # ENABLE 2D lateral heat flow
+  lateral_conductivity_factor: 1.0  # Isotropic granite
+  shadow_timestep_minutes: 60.0     # Shadow cache time resolution
+
+initial_conditions:
+  type: "spinup"
+  spinup_days: 0  # Run 1 day spinup to reach quasi-equilibrium
+
+output:
+  directory: "output/rocky_ridge_2d"
+  save_interval_seconds: 3600  # Hourly
+  save_temperature_fields: true
+  save_energy_diagnostics: true
+  checkpoint_interval_seconds: 14400  # Every 4 hours
+
+  # Automatic visualization
+  generate_plots: true
+  plot_format: "png"
+  plot_dpi: 150
+  plot_types:
+    - "terrain_elevation"      # Terrain map (created once)
+    - "hourly_summary"          # NEW: 4-panel (T, shadow, fluxes, subsurface)
+    - "diagnostics_timeseries"  # Enhanced with flux time series

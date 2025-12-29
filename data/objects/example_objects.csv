@@ -1,0 +1,20 @@
+# Example object list file for thermal simulation
+# Format: CSV with header
+# Lines starting with # are comments
+#
+# Required columns: name, mesh_file, x, y, z, material, thickness
+# Optional columns: rx, ry, rz (rotation angles in degrees), enabled (true/false), ground_clamped (true/false)
+#
+name,mesh_file,x,y,z,material,thickness,rx,ry,rz,enabled,ground_clamped
+# Small buildings in a row
+building_1,examples/simple_building.obj,10.0,10.0,0.0,granite,0.2,0,0,0,true,true
+building_2,examples/simple_building.obj,20.0,10.0,0.0,granite,0.2,0,0,45,true,true
+building_3,examples/simple_building.obj,30.0,10.0,0.0,granite,0.2,0,0,90,true,true
+# Test cubes at various heights (z ignored with ground_clamped)
+cube_ground,examples/cube_1m.obj,10.0,20.0,0.0,granite,0.1,0,0,0,true,true
+cube_elevated,examples/cube_1m.obj,15.0,20.0,0.0,granite,0.1,0,0,45,true,true
+# Boxes for vehicles
+vehicle_1,examples/box_2x1x1m.obj,25.0,15.0,0.0,granite,0.05,0,0,0,true,true
+vehicle_2,examples/box_2x1x1m.obj,25.0,20.0,0.0,granite,0.05,0,0,90,true,true
+# Disabled object (won't be loaded)
+test_disabled,examples/cube_1m.obj,40.0,40.0,0.0,granite,0.1,0,0,0,false,true

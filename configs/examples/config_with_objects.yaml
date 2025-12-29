@@ -1,0 +1,160 @@
+# Example Configuration File: Object Mesh Support
+# This shows how to configure 3D thermal objects in a simulation
+
+simulation:
+  name: "thermal_scene_with_objects"
+  start_time: "2025-06-21T06:00:00"
+  end_time: "2025-06-22T06:00:00"
+  time_step: 120  # seconds
+  output_interval: 600  # seconds (save every 10 minutes)
+
+terrain:
+  source: "file"
+  file: "data/dem/site_terrain.npy"
+  nx: 200
+  ny: 200
+  dx: 1.0  # meters
+  dy: 1.0  # meters
+
+materials:
+  database: "data/materials/representative_materials.json"
+  classification_map: "data/materials/terrain_materials.npy"
+
+location:
+  latitude: 35.0
+  longitude: -106.0
+  timezone_offset: -7.0
+
+atmosphere:
+  temperature:
+    model: "diurnal"
+    T_max: 310.0  # Kelvin (37°C)
+    T_min: 285.0  # Kelvin (12°C)
+
+  wind:
+    model: "constant"
+    speed: 3.0  # m/s
+
+  sky_temperature:
+    model: "idso"  # Best for desert conditions
+
+  convection:
+    model: "watmuff"  # Best for terrain
+
+solar:
+  irradiance_model: "ineichen"  # High-accuracy clear-sky model
+  shadow_cache: true
+  shadow_timestep: 3600  # seconds (compute shadows every hour)
+
+# ============================================================================
+# OBJECT MESH CONFIGURATION
+# ============================================================================
+# This section defines 3D thermal objects to place on the terrain.
+# Each object is loaded from an OBJ Wavefront file and positioned at
+# specified (x, y, z) coordinates in the terrain coordinate system.
+#
+# Objects receive full thermal solution using the 1D solver per face,
+# and participate in shadow casting/receiving with the terrain.
+# ============================================================================
+
+objects:
+  # Example 1: Simple building
+  - name: "building_1"
+    mesh_file: "building_simple.obj"  # Relative to data/objects/
+    location: [50.0, 75.0, 0.0]       # x, y, z in meters
+    material: "concrete"               # Material from database
+    thickness: 0.2                     # 20 cm wall thickness
+    rotation: [0.0, 0.0, 45.0]        # Euler angles [rx, ry, rz] in degrees
+    enabled: true                      # Can toggle object on/off
+    ground_clamped: true               # Auto-placed on terrain surface
+
+  # Example 2: Military vehicle
+  - name: "vehicle_1"
+    mesh_file: "truck_simplified.obj"
+    location: [120.0, 95.0, 0.0]
+    material: "steel"
+    thickness: 0.003                   # 3 mm metal skin
+    rotation: [0.0, 0.0, 90.0]        # Rotated 90° to face east
+    enabled: true
+    ground_clamped: true               # Auto-placed on terrain surface
+
+  # Example 3: Storage tank (cylindrical)
+  - name: "fuel_tank"
+    mesh_file: "cylinder_20m.obj"
+    location: [180.0, 150.0, 0.0]
+    material: "steel"
+    thickness: 0.01                    # 1 cm thick wall
+    rotation: [90.0, 0.0, 0.0]        # Horizontal cylinder (rotated about x)
+    enabled: true
+    ground_clamped: true               # Auto-placed on terrain surface
+
+  # Example 4: Small structure (disabled for this run)
+  - name: "shed"
+    mesh_file: "shed_4x3m.obj"
+    location: [30.0, 30.0, 0.0]
+    material: "wood"
+    thickness: 0.05                    # 5 cm plywood
+    enabled: false                     # Disabled - won't be loaded
+    ground_clamped: true               # Auto-placed on terrain surface
+
+  # Example 5: Equipment with custom material properties
+  - name: "generator"
+    mesh_file: "box_2x1x1m.obj"
+    location: [75.0, 60.0, 0.0]
+    material: "steel"
+    thickness: 0.005
+    rotation: [0.0, 0.0, 0.0]
+    enabled: true
+    ground_clamped: true               # Auto-placed on terrain surface
+
+output:
+  directory: "output/thermal_scene_with_objects"
+  save_fields: true
+  save_plots: true
+  plot_interval: 3600  # Generate plots every hour
+
+# ============================================================================
+# NOTES ON OBJECT CONFIGURATION
+# ============================================================================
+#
+# Object Coordinate System:
+# - x: Easting (meters)
+# - y: Northing (meters)
+# - z: Elevation above terrain (meters)
+#   - z=0 means object sits on terrain surface
+#   - z>0 means object is elevated above terrain
+#
+# Rotation Convention:
+# - Euler angles in degrees: [rx, ry, rz]
+# - Applied in order: Z (yaw) → Y (pitch) → X (roll)
+# - Example: [0, 0, 45] rotates object 45° clockwise about vertical axis
+#
+# Material Requirements:
+# - Material name must exist in materials database
+# - Thickness determines subsurface thermal mass per face
+# - Each face of object gets independent 1D thermal solution
+#
+# OBJ File Format:
+# - Simple ASCII text format
+# - Required elements: vertices (v), faces (f)
+# - Optional: vertex normals (vn) - computed if not provided
+# - Faces can be triangles or quads (quads auto-triangulated)
+# - Example OBJ file structure:
+#     v 0.0 0.0 0.0      # Vertex 1
+#     v 1.0 0.0 0.0      # Vertex 2
+#     v 1.0 1.0 0.0      # Vertex 3
+#     f 1 2 3            # Triangle face
+#
+# Shadow Interactions:
+# - Object → Terrain: Objects cast shadows on terrain
+# - Terrain → Object: Terrain shadows can fall on objects
+# - Object → Self: Objects can self-shadow (e.g., one side blocks sun from other)
+# - Object → Object: Multiple objects can shadow each other
+#
+# Performance Considerations:
+# - Each object face adds computational cost
+# - Recommended: Use simplified meshes (100-1000 faces per object)
+# - Complex CAD models: Decimate/simplify before use
+# - Shadow computation scales with total face count
+#
+# ============================================================================

@@ -1,0 +1,57 @@
+# Test configuration with objects loaded from file
+
+simulation:
+  name: "object_file_test"
+  start_time: "2025-06-21T06:00:00"
+  duration_hours: 6
+  time_step: 120
+
+site:
+  latitude: 35.0
+  longitude: -106.0
+  altitude: 1500.0
+  timezone_offset: -7.0
+
+terrain:
+  type: "flat"
+  nx: 50
+  ny: 50
+  dx: 1.0
+  dy: 1.0
+  flat_elevation: 0.0
+
+materials:
+  type: "uniform"
+  default_material: "granite"
+
+atmosphere:
+  temperature:
+    model: "diurnal"
+    mean_kelvin: 298.15
+    amplitude_kelvin: 10.0
+  wind:
+    model: "diurnal"
+    mean_speed: 3.0
+    amplitude: 1.0
+  sky_temperature_model: "idso"
+
+subsurface:
+  z_max: 0.5
+  n_layers: 20
+
+solver:
+  enable_lateral_conduction: false
+  lateral_conductivity_factor: 1.0
+  shadow_timestep_minutes: 60.0
+
+initial_conditions:
+  type: "uniform"
+  temperature_kelvin: 298.0
+
+output:
+  directory: "output/object_file_test"
+  save_interval_seconds: 3600.0
+
+# Load objects from external CSV file
+objects:
+  from_file: "data/objects/example_objects.csv"

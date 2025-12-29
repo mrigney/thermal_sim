@@ -1,0 +1,155 @@
+# Urban Objects Demonstration Configuration
+#
+# This configuration demonstrates the full object thermal simulation capabilities:
+# - Multiple 3D objects (buildings, vehicles)
+# - Object shadows on terrain
+# - Per-face thermal solution
+# - Separate terrain/object outputs for visualization
+#
+# Output structure:
+#   output/urban_objects_demo/
+#     terrain/          - Terrain temperature fields
+#     objects/          - Per-object thermal data + geometry
+#       building_1/     - OBJ mesh + face temperatures
+#       vehicle_1/      - Ready for Blender import
+#     diagnostics/      - Energy balance timeseries
+
+simulation:
+  name: "urban_objects_demo"
+  start_time: "2025-06-21T06:00:00"  # Summer solstice
+  duration_hours: 12                  # Full day simulation
+  time_step: 60                       # 60 second timesteps
+
+site:
+  latitude: 35.0                      # Albuquerque, NM
+  longitude: 106.0
+  altitude: 1500.0                    # meters
+  timezone_offset: -7.0               # MST
+
+terrain:
+  type: "flat"
+  nx: 100                             # 100x100 meter domain
+  ny: 100
+  dx: 1.0
+  dy: 1.0
+  flat_elevation: 0.0
+
+materials:
+  type: "uniform"
+  default_material: "dry sand"        # Desert terrain
+
+atmosphere:
+  temperature:
+    model: "diurnal"
+    mean_kelvin: 298.15               # 25°C mean
+    amplitude_kelvin: 12.0            # ±12°C diurnal range
+  wind:
+    model: "diurnal"
+    mean_speed: 3.0                   # m/s
+    amplitude: 1.5
+  sky_temperature_model: "idso"       # Clear desert sky
+
+subsurface:
+  z_max: 0.5                          # 50 cm depth
+  n_layers: 20                        # Good stability for objects too
+  stretch_factor: 1.2                 # Finer near surface
+
+solver:
+  enable_lateral_conduction: false    # 1D columns only
+  lateral_conductivity_factor: 1.0
+  shadow_timestep_minutes: 30.0       # Shadow cache time resolution (default: 60)
+
+initial_conditions:
+  type: "uniform"
+  temperature_kelvin: 290.0           # Cool morning start (17°C)
+
+output:
+  directory: "output/urban_objects_demo"
+  save_interval_seconds: 1800.0       # Every 30 minutes
+  save_temperature_fields: true
+  save_energy_diagnostics: true
+   # Automatic visualization
+  generate_plots: true
+  plot_format: "png"
+  plot_dpi: 150
+  plot_types:
+    - "terrain_elevation"      # Terrain map (created once)
+    - "hourly_summary"          # NEW: 4-panel (T, shadow, fluxes, subsurface)
+    - "diagnostics_timeseries"  # Enhanced with flux time series
+
+# 3D thermal objects - demonstrates inline specification
+objects:
+  # Simple building - cubic structure
+  - name: "building_1"
+    mesh_file: "examples/simple_building.obj"
+    location: [30.0, 50.0, 0.0]       # Center-left of domain
+    material: "granite"                # Stone building
+    thickness: 0.25                    # 25 cm walls
+    rotation: [0.0, 0.0, 0.0]         # No rotation
+    enabled: true
+    ground_clamped: true               # Auto-placed on terrain surface
+
+  # Rotated building - show orientation effects
+  - name: "building_2"
+    mesh_file: "examples/simple_building.obj"
+    location: [50.0, 50.0, 0.0]       # Center of domain
+    material: "granite"
+    thickness: 0.25
+    rotation: [0.0, 0.0, 45.0]        # 45° rotation around Z
+    enabled: true
+    ground_clamped: true               # Auto-placed on terrain surface
+
+  # Elevated cube - shows shadow length variation
+  - name: "water_tower"
+    mesh_file: "examples/cube_1m.obj"
+    location: [70.0, 50.0, 0.0]       # z ignored - placed on terrain
+    material: "granite"
+    thickness: 0.1
+    enabled: true
+    ground_clamped: true               # Auto-placed on terrain surface
+
+  # Vehicle 1 - elongated box
+  - name: "vehicle_1"
+    mesh_file: "examples/box_2x1x1m.obj"
+    location: [40.0, 30.0, 0.0]
+    material: "granite"                # Metal-like thermal properties
+    thickness: 0.02                    # Thin metal shell
+    rotation: [0.0, 0.0, 0.0]         # Aligned with road
+    enabled: true
+    ground_clamped: true               # Auto-placed on terrain surface
+
+  # Vehicle 2 - rotated parking
+  - name: "vehicle_2"
+    mesh_file: "examples/box_2x1x1m.obj"
+    location: [60.0, 30.0, 0.0]
+    material: "granite"
+    thickness: 0.02
+    rotation: [0.0, 0.0, 90.0]        # Perpendicular parking
+    enabled: true
+    ground_clamped: true               # Auto-placed on terrain surface
+
+  # Ground cube - reference object on terrain
+  - name: "reference_cube"
+    mesh_file: "examples/cube_1m.obj"
+    location: [50.0, 20.0, 0.0]
+    material: "basalt"                 # Dark material (high absorptivity)
+    thickness: 0.1
+    enabled: true
+    ground_clamped: true               # Auto-placed on terrain surface
+
+# Notes for post-processing:
+#
+# Blender Visualization:
+#   1. Import geometry.obj from objects/building_1/
+#   2. Load face_temperature_NNNN.npy for timestep N
+#   3. Map temperatures to vertex colors
+#   4. Animate through timesteps
+#
+# Python Analysis:
+#   temps = np.load('objects/building_1/face_temperature_0010.npy')
+#   flux = np.load('objects/building_1/face_solar_flux_0010.npy')
+#   shadows = np.load('objects/building_1/face_shadow_fraction_0010.npy')
+#
+# Terrain Comparison:
+#   terrain_T = np.load('terrain/surface_temperature_0010.npy')
+#   # Compare object vs terrain temperatures

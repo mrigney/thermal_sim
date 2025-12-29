@@ -1,0 +1,66 @@
+# Shadow Study - Topographic Effects
+#
+# High-resolution study of shadow and topographic effects on surface
+# temperature distribution. Uses fine spatial resolution and frequent output.
+
+simulation:
+  name: "shadow_topography_study"
+  start_time: "2025-12-21T06:00:00"  # Winter solstice (low sun angle)
+  duration_hours: 12  # Sunrise to sunset
+  time_step: 60  # 1 minute for fine temporal resolution
+
+site:
+  latitude: 45.0    # Mid-latitude (shadows more pronounced)
+  longitude: 110.0
+  altitude: 1000
+
+terrain:
+  type: "synthetic"
+  nx: 200
+  ny: 200
+  dx: 0.25  # 25 cm spacing (very fine)
+  dy: 0.25
+
+materials:
+  type: "uniform"
+  default_material: "basalt"  # Dark volcanic rock
+
+atmosphere:
+  temperature:
+    model: "diurnal"
+    mean_kelvin: 273.15      # 0°C (winter)
+    amplitude_kelvin: 8.0    # Smaller swings in winter
+  wind:
+    model: "diurnal"
+    mean_speed: 2.0
+    amplitude: 1.0
+  sky_temperature_model: "idso"
+
+subsurface:
+  z_max: 0.3        # Shallow (focus on surface effects)
+  n_layers: 15
+  stretch_factor: 1.3
+
+solver:
+  enable_lateral_conduction: true
+  lateral_conductivity_factor: 1.0
+  shadow_timestep_minutes: 30.0     # Finer shadow resolution for shadow study
+
+initial_conditions:
+  type: "spinup"
+  spinup_days: 2  # Longer spinup for stable initial state
+
+output:
+  directory: "output/shadow_study"
+  save_interval_seconds: 600  # Every 10 minutes (high temporal resolution)
+  save_temperature_fields: true
+  save_energy_diagnostics: true
+  checkpoint_interval_seconds: 3600  # Hourly checkpoints
+
+  # Automatic visualization - high resolution study
+  generate_plots: true
+  plot_format: "png"
+  plot_dpi: 200  # Higher resolution for publication
+  plot_types:
+    - "surface_temperature"
+    - "diagnostics_timeseries"

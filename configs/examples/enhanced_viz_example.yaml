@@ -1,0 +1,65 @@
+# Enhanced Visualization Example Configuration
+# Demonstrates new multi-panel diagnostic plots with energy fluxes
+
+simulation:
+  name: "enhanced_visualization_demo"
+  start_time: "2025-06-21 06:00:00"
+  end_time: "2025-06-22 06:00:00"  # 24 hours
+  dt: 120  # 2 minutes
+
+site:
+  latitude: 35.0  # degrees N
+  longitude: 106.0  # degrees W (positive = West)
+  altitude: 1500.0  # meters
+  timezone_offset: -7.0  # Mountain Standard Time (MST = UTC-7)
+
+terrain:
+  type: "synthetic"
+  nx: 80
+  ny: 80
+  dx: 1.0  # meters
+  dy: 1.0  # meters
+
+materials:
+  type: "uniform"
+  default_material: "granite"  # High thermal inertia
+  custom_materials: []
+
+atmosphere:
+  temperature_model: "diurnal"
+  temperature_mean: 298.0  # 25°C
+  temperature_amplitude: 15.0  # ±15K diurnal range
+  wind_model: "diurnal"
+  wind_mean: 3.0  # m/s
+  wind_amplitude: 1.5  # m/s
+
+subsurface:
+  z_max: 1.0  # meters
+  n_layers: 20
+  stretch_factor: 1.2
+
+solver:
+  enable_lateral_conduction: true
+  lateral_conductivity_factor: 1.0
+  shadow_timestep_minutes: 60.0
+
+initial_conditions:
+  type: "spinup"
+  temperature_kelvin: 298.0
+  spinup_days: 0
+
+output:
+  directory: "output/enhanced_viz_demo"
+  save_interval_seconds: 3600  # Hourly
+  save_temperature_fields: true
+  save_energy_diagnostics: true
+  checkpoint_interval_seconds: null
+
+  # Visualization settings
+  generate_plots: true
+  plot_format: "png"
+  plot_dpi: 150
+  plot_types:
+    - "terrain_elevation"      # Terrain map (created once)
+    - "hourly_summary"          # NEW: 4-panel (T, shadow, fluxes, subsurface)
+    - "diagnostics_timeseries"  # Enhanced with flux time series

@@ -1,0 +1,64 @@
+{
+  "materials": [
+    {
+      "class_id": 1,
+      "name": "Dry Sand",
+      "alpha": 0.6,
+      "epsilon": 0.9,
+      "k": 0.3,
+      "rho": 1600.0,
+      "cp": 800.0,
+      "roughness": 0.001
+    },
+    {
+      "class_id": 2,
+      "name": "Granite",
+      "alpha": 0.55,
+      "epsilon": 0.95,
+      "k": 2.5,
+      "rho": 2700.0,
+      "cp": 790.0,
+      "roughness": 0.01
+    },
+    {
+      "class_id": 3,
+      "name": "Basalt",
+      "alpha": 0.75,
+      "epsilon": 0.95,
+      "k": 2.0,
+      "rho": 2900.0,
+      "cp": 840.0,
+      "roughness": 0.015
+    },
+    {
+      "class_id": 4,
+      "name": "Dry Soil",
+      "alpha": 0.65,
+      "epsilon": 0.92,
+      "k": 0.4,
+      "rho": 1500.0,
+      "cp": 850.0,
+      "roughness": 0.005
+    },
+    {
+      "class_id": 5,
+      "name": "Sandstone",
+      "alpha": 0.5,
+      "epsilon": 0.93,
+      "k": 1.8,
+      "rho": 2200.0,
+      "cp": 800.0,
+      "roughness": 0.02
+    },
+    {
+      "class_id": 6,
+      "name": "Gravel",
+      "alpha": 0.62,
+      "epsilon": 0.91,
+      "k": 0.8,
+      "rho": 1800.0,
+      "cp": 820.0,
+      "roughness": 0.02
+    }
+  ]
+}

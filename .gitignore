@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Output directories
+output/
+*.npy
+*.npz
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+nul
+temp_*.txt
+*_output.txt
+conversation_transcript.txt
+
+# Debug and test scripts (keep formal tests in tests/)
+test_*.py
+debug_*.py
+benchmark_*.py
+
+# Data files (large)
+# Uncomment if you have large data files that shouldn't be in Git
+# data/dem/*.npy
+# data/materials/*.npy
+
+# Outputs folder (if different from output/)
+outputs/
