@@ -1,0 +1,79 @@
+# Demo configuration for depth-varying materials
+#
+# This example demonstrates using the SQLite materials database
+# with depth-varying thermal properties. The simulation runs on
+# flat terrain with Desert Sand that has properties varying with depth.
+#
+# To run: python main.py configs/examples/depth_varying_demo.yaml
+
+simulation:
+  name: "depth_varying_demo"
+  start_time: "2024-06-21T06:00:00"  # Summer solstice, 6 AM
+  duration_hours: 24  # One full day
+  time_step: 1800  # 30 minutes (seconds)
+
+site:
+  latitude: 35.0  # Albuquerque, NM (degrees N)
+  longitude: 106.0  # (degrees W, positive = West)
+  altitude: 1500.0  # meters above sea level
+  timezone_offset: -7.0  # Mountain Time (UTC-7)
+
+terrain:
+  type: "flat"
+  nx: 20
+  ny: 20
+  dx: 10.0  # 10 meter spacing
+  dy: 10.0
+  flat_elevation: 0.0
+
+materials:
+  type: "uniform"
+  default_material: "Desert Sand (Depth-Varying)"
+
+  # SQLite database options
+  use_sqlite_database: true
+  sqlite_database_path: "data/materials/materials.db"
+
+atmosphere:
+  # Diurnal temperature cycle
+  temperature:
+    model: "diurnal"
+    mean_kelvin: 300.0  # 27 C mean
+    amplitude_kelvin: 15.0  # ±15 C variation
+
+  # Diurnal wind cycle
+  wind:
+    model: "diurnal"
+    mean_speed: 3.0  # m/s
+    amplitude: 1.0  # m/s
+
+  sky_temperature_model: "idso"  # Best for desert conditions
+
+subsurface:
+  z_max: 0.5  # 50 cm depth
+  n_layers: 20  # Fine vertical resolution
+  stretch_factor: 1.2  # Finer spacing near surface
+
+solver:
+  enable_lateral_conduction: false
+  lateral_conductivity_factor: 1.0
+  shadow_timestep_minutes: 60.0
+
+initial_conditions:
+  type: "uniform"
+  temperature_kelvin: 300.0  # Start at mean temperature
+
+output:
+  directory: "output/depth_varying_demo"
+  save_interval_seconds: 3600.0  # Save hourly
+  save_temperature_fields: true
+  save_energy_diagnostics: true
+
+  # Visualization options
+  generate_plots: true
+  plot_format: "png"
+  plot_dpi: 150
+  plot_types:
+    - "surface_temperature"
+    - "diagnostics_timeseries"
+    - "hourly_summary"

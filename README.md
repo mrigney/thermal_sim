@@ -90,11 +90,13 @@ thermal_sim/
 - Sky view factor calculation
 - Multiple terrain types: flat, rolling hills, ridges, valleys
 
-**Materials Module** ([src/materials.py](src/materials.py))
-- Material property database management
-- Spatial material field handling
-- JSON import/export
+**Materials Module** ([src/materials.py](src/materials.py), [src/materials_db.py](src/materials_db.py))
+- Material property database management (JSON and SQLite)
+- **Depth-varying thermal properties** with SQLite database
+- Spatial material field handling with depth interpolation
 - Representative desert materials included
+- Scientific provenance tracking and material versioning
+- 9 materials available (6 legacy + 3 depth-varying)
 
 **Visualization Module** ([src/visualization.py](src/visualization.py))
 - Terrain geometry visualization (elevation, slope, aspect)
@@ -149,21 +151,34 @@ Components:
 
 ## Material Properties
 
-The simulator tracks spatially-varying material properties:
+The simulator tracks spatially-varying material properties with optional depth variation:
+
+**Surface Properties:**
 - Solar absorptivity (α)
 - Thermal emissivity (ε)
+- Surface roughness
+
+**Thermal Properties (can vary with depth):**
 - Thermal conductivity (k)
 - Density (ρ)
 - Specific heat capacity (cp)
-- Surface roughness
 
-Included materials (desert terrain):
+### Available Materials
+
+**Legacy materials (uniform depth):**
 1. Dry Sand
 2. Granite
 3. Basalt
 4. Dry Soil
 5. Sandstone
 6. Gravel
+
+**Depth-varying materials:**
+7. Desert Sand (Depth-Varying) - Presley & Christensen (1997)
+8. Basalt (Weathered to Fresh) - Christensen (1986)
+9. Lunar Regolith Analog - Cremers (1975)
+
+See [docs/materials_database.md](docs/materials_database.md) for complete documentation.
 
 ## Usage Examples
 

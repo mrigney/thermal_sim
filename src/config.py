@@ -62,6 +62,10 @@ class MaterialsConfig:
     classification_file: Optional[str] = None  # for type="from_classification"
     custom_materials: List[Dict[str, Any]] = field(default_factory=list)
 
+    # SQLite database options (for depth-varying materials)
+    use_sqlite_database: bool = False  # If True, use SQLite instead of JSON
+    sqlite_database_path: str = "data/materials/materials.db"  # Path to SQLite database
+
 
 @dataclass
 class AtmosphereConfig:
@@ -347,7 +351,9 @@ class ThermalSimConfig:
             type=materials_dict.get('type', 'uniform'),
             default_material=materials_dict.get('default_material', 'sand'),
             classification_file=materials_dict.get('classification_file'),
-            custom_materials=materials_dict.get('custom_materials', [])
+            custom_materials=materials_dict.get('custom_materials', []),
+            use_sqlite_database=materials_dict.get('use_sqlite_database', False),
+            sqlite_database_path=materials_dict.get('sqlite_database_path', 'data/materials/materials.db')
         )
 
         # Parse atmosphere section
@@ -543,6 +549,14 @@ class ThermalSimConfig:
                 raise ValueError("materials.type='from_classification' requires 'classification_file'")
             if not Path(self.materials.classification_file).exists():
                 raise FileNotFoundError(f"Materials file not found: {self.materials.classification_file}")
+
+        # Check SQLite database if specified
+        if self.materials.use_sqlite_database:
+            if not Path(self.materials.sqlite_database_path).exists():
+                raise FileNotFoundError(
+                    f"SQLite materials database not found: {self.materials.sqlite_database_path}"
+                )
+            print(f"INFO: Using SQLite materials database: {self.materials.sqlite_database_path}")
 
         # Check initial state file if specified
         if self.initial_conditions.type == "from_file":

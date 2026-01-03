@@ -197,6 +197,183 @@ class MaterialField:
         print(f"Assigned material properties for {len(unique_classes)} material classes")
 
 
+class MaterialFieldDepthVarying(MaterialField):
+    """
+    Spatially-varying material properties with depth-varying thermal characteristics.
+
+    Extends MaterialField to support depth-varying thermal properties from
+    SQLite database. Inherits surface property handling from base class.
+
+    Key Differences from MaterialField:
+    - Accepts MaterialDatabaseSQLite instead of MaterialDatabase
+    - Interpolates depth-varying properties to subsurface grid depths
+    - Fills 3D arrays (k, rho, cp) with depth-dependent values
+    - Surface properties (alpha, epsilon, roughness) remain 2D
+
+    Usage:
+        db = MaterialDatabaseSQLite("materials.db")
+        materials = MaterialFieldDepthVarying(ny, nx, nz, db)
+        materials.assign_from_classification(material_class, subsurface_grid)
+    """
+
+    def __init__(self, ny: int, nx: int, nz: int, material_db):
+        """
+        Initialize material field with SQLite database support.
+
+        Args:
+            ny: Number of grid points in y
+            nx: Number of grid points in x
+            nz: Number of subsurface layers
+            material_db: MaterialDatabaseSQLite instance
+        """
+        # Import here to avoid circular dependency
+        from src.materials_db import MaterialDatabaseSQLite
+
+        if not isinstance(material_db, MaterialDatabaseSQLite):
+            raise TypeError(
+                "MaterialFieldDepthVarying requires MaterialDatabaseSQLite, "
+                f"got {type(material_db).__name__}"
+            )
+
+        # Call parent constructor
+        super().__init__(ny, nx, nz, material_db)
+
+    def assign_from_classification(self, material_class: np.ndarray,
+                                   subsurface_grid=None):
+        """
+        Assign material properties based on classification map.
+
+        If subsurface_grid is provided, interpolates depth-varying thermal
+        properties to grid depths. Otherwise falls back to uniform depth
+        (broadcasts surface properties).
+
+        Args:
+            material_class: Integer array of material class IDs or names, shape (ny, nx)
+            subsurface_grid: SubsurfaceGrid instance for depth interpolation (optional)
+        """
+        if material_class.shape != (self.ny, self.nx):
+            raise ValueError(
+                f"Classification map shape {material_class.shape} doesn't match "
+                f"grid size ({self.ny}, {self.nx})"
+            )
+
+        if subsurface_grid is not None:
+            # Depth-varying assignment
+            self._assign_depth_varying(material_class, subsurface_grid)
+        else:
+            # Fallback to uniform depth (broadcast surface properties)
+            print("Warning: No subsurface_grid provided, using uniform depth properties")
+            self._assign_uniform_depth(material_class)
+
+    def _assign_depth_varying(self, material_class: np.ndarray, subsurface_grid):
+        """
+        Assign depth-varying properties from SQLite database.
+
+        For each unique material in classification map:
+        1. Query material from database
+        2. Interpolate properties to subsurface grid depths
+        3. Fill 3D arrays with interpolated values
+
+        Args:
+            material_class: Integer array of material class IDs, shape (ny, nx)
+            subsurface_grid: SubsurfaceGrid with z_nodes array
+        """
+        # Get target depths from subsurface grid
+        target_depths = subsurface_grid.z_nodes
+
+        # Get unique material classes in the map
+        unique_classes = np.unique(material_class)
+
+        print(f"Assigning depth-varying properties for {len(unique_classes)} materials")
+        print(f"  Interpolating to {len(target_depths)} depth points: "
+              f"{target_depths[0]:.4f} to {target_depths[-1]:.4f} m")
+
+        # Process each material
+        for class_id in unique_classes:
+            # Get material from database
+            # Support both integer IDs and string names
+            if isinstance(class_id, (int, np.integer)):
+                # For integer IDs, we need to map to material names
+                # This requires the classification map to use material_id values
+                # For now, treat integers as material names for legacy compatibility
+                material = self.material_db.get_material(str(class_id))
+                if material is None:
+                    # Try as material name lookup
+                    material = self.material_db.get_material_by_name(str(class_id))
+            else:
+                # String name
+                material = self.material_db.get_material_by_name(str(class_id))
+
+            if material is None:
+                # Try listing all materials to help debug
+                available = self.material_db.list_materials()
+                available_names = [name for _, name, _ in available]
+                raise ValueError(
+                    f"Material '{class_id}' not found in database. "
+                    f"Available materials: {available_names}"
+                )
+
+            # Get mask for this material
+            mask = (material_class == class_id)
+
+            # Assign surface properties (2D, same as base class)
+            self.alpha[mask] = material.alpha
+            self.epsilon[mask] = material.epsilon
+            self.roughness[mask] = material.roughness
+
+            # Interpolate thermal properties to target depths
+            interp_props = material.interpolate_to_depths(target_depths)
+
+            # Assign depth-varying thermal properties (3D)
+            for iz in range(self.nz):
+                self.k[mask, iz] = interp_props['k'][iz]
+                self.rho[mask, iz] = interp_props['rho'][iz]
+                self.cp[mask, iz] = interp_props['cp'][iz]
+
+            # Print summary for this material
+            print(f"  - '{material.name}': {len(material.depths)} depth points -> "
+                  f"{self.nz} grid layers")
+            print(f"    k range: {interp_props['k'].min():.3f} to "
+                  f"{interp_props['k'].max():.3f} W/(m*K)")
+
+    def _assign_uniform_depth(self, material_class: np.ndarray):
+        """
+        Fallback: Assign uniform properties (broadcast to all depths).
+
+        Uses surface values for all depths, similar to legacy MaterialField.
+
+        Args:
+            material_class: Integer array of material class IDs, shape (ny, nx)
+        """
+        unique_classes = np.unique(material_class)
+
+        print(f"Warning: Assigning uniform (non-depth-varying) properties")
+
+        for class_id in unique_classes:
+            # Get material from database
+            material = self.material_db.get_material_by_name(str(class_id))
+
+            if material is None:
+                raise ValueError(f"Material '{class_id}' not found in database")
+
+            mask = (material_class == class_id)
+
+            # Surface properties
+            self.alpha[mask] = material.alpha
+            self.epsilon[mask] = material.epsilon
+            self.roughness[mask] = material.roughness
+
+            # Subsurface properties (use surface values, broadcast to all depths)
+            k_surface = material.k[0]  # First depth point
+            rho_surface = material.rho[0]
+            cp_surface = material.cp[0]
+
+            for iz in range(self.nz):
+                self.k[mask, iz] = k_surface
+                self.rho[mask, iz] = rho_surface
+                self.cp[mask, iz] = cp_surface
+
+
 def create_representative_materials() -> MaterialDatabase:
     """
     Create a representative material database for testing.
