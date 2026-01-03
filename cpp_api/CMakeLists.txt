@@ -50,6 +50,15 @@ if(BUILD_EXAMPLES)
         PRIVATE
             materials_database
     )
+
+    add_executable(example_accessors
+        examples/example_accessors.cpp
+    )
+
+    target_link_libraries(example_accessors
+        PRIVATE
+            materials_database
+    )
 endif()
 
 # Installation

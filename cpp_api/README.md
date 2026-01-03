@@ -6,6 +6,7 @@ A modern C++17 API for accessing the SQLite materials database with depth-varyin
 
 - **Modern C++17** - Uses `std::optional`, `std::vector`, exceptions
 - **Type-safe** - Strong typing for all material properties
+- **Flexible API** - Direct member access or functional-style accessor functions
 - **Header + Implementation** - Clean separation for easy integration
 - **Full CRUD operations** - Create, Read, Update, Delete materials
 - **Depth interpolation** - Linear interpolation to arbitrary depths
@@ -30,11 +31,16 @@ cmake ..
 cmake --build .
 ```
 
-### Running the Example
+### Running the Examples
 
 ```bash
 # From build directory
+
+# Basic usage examples (database operations, queries, interpolation)
 ./example_usage
+
+# Accessor function examples (functional programming style)
+./example_accessors
 ```
 
 ## Basic Usage
@@ -129,6 +135,67 @@ new_mat.notes = "Measured in laboratory";
 std::string mat_id = db.add_material(new_mat);
 std::cout << "Added material with ID: " << mat_id << '\n';
 ```
+
+### Using Accessor Functions (Alternative Style)
+
+The API also provides free function getters/setters for a more functional programming style:
+
+```cpp
+#include "materials_db.hpp"
+#include "materials_db_accessors.hpp"
+
+using namespace thermal;
+
+MaterialPropertiesDepth mat;
+
+// Using free function setters
+Name(mat, "Example Material");
+Version(mat, 1);
+Alpha(mat, 0.85);
+Epsilon(mat, 0.90);
+Roughness(mat, 0.005);
+
+// Set depth-varying properties
+Depths(mat, {0.0, 0.10, 0.25, 0.50});
+K(mat, {0.5, 0.6, 0.7, 0.8});              // Short form
+Rho(mat, {1600, 1650, 1700, 1750});        // Short form
+Cp(mat, {850, 850, 850, 850});             // Short form
+
+// Or use full names
+ThermalConductivity(mat, {0.5, 0.6, 0.7, 0.8});
+Density(mat, {1600, 1650, 1700, 1750});
+SpecificHeat(mat, {850, 850, 850, 850});
+
+// Using free function getters
+std::cout << "Name: " << Name(mat) << '\n';
+std::cout << "Alpha: " << Alpha(mat) << '\n';
+
+// Derived properties
+double I = ThermalInertia(mat, 0.0);
+double alpha_d = ThermalDiffusivity(mat, 0.0);
+
+// Interpolation
+double k_at_15cm = InterpolateK(mat, 0.15);
+```
+
+**Available accessor functions:**
+- **String properties**: `MaterialId()`, `Name()`, `SourceDatabase()`, `SourceCitation()`, `Notes()`, `Supersedes()`
+- **Numeric properties**: `Version()`, `Alpha()`, `Epsilon()`, `Roughness()`
+- **Thermal arrays**: `Depths()`, `K()`, `Rho()`, `Cp()`, `ThermalConductivity()`, `Density()`, `SpecificHeat()`
+- **Derived properties**: `ThermalInertia()`, `ThermalDiffusivity()`
+- **Interpolation**: `InterpolateK()`, `InterpolateRho()`, `InterpolateCp()`, `InterpolateToDepths()`
+- **Validation**: `Validate()`
+
+Each function has two forms:
+```cpp
+// Getter: returns value
+Type FunctionName(const MaterialPropertiesDepth& mat);
+
+// Setter: modifies object
+void FunctionName(MaterialPropertiesDepth& mat, Type value);
+```
+
+See `examples/example_accessors.cpp` for comprehensive usage examples.
 
 ## API Reference
 
