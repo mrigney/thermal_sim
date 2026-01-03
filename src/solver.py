@@ -340,13 +340,16 @@ def compute_energy_balance(
 def solve_subsurface_tridiagonal(
     T_prev: np.ndarray,
     Q_surface_net: np.ndarray,
-    thermal_diffusivity: np.ndarray,
-    rho_cp: np.ndarray,
+    thermal_conductivity: np.ndarray,
+    density: np.ndarray,
+    specific_heat: np.ndarray,
     subsurface_grid: SubsurfaceGrid,
     dt: float
 ) -> np.ndarray:
     """
     Solve 1D subsurface heat equation using Crank-Nicolson method with flux BC
+
+    Supports both uniform and depth-varying material properties.
 
     Solves: ρc_p ∂T/∂t = ∂/∂z(k ∂T/∂z)
 
@@ -365,10 +368,14 @@ def solve_subsurface_tridiagonal(
         Note: T_prev[:,:,0] is the surface temperature
     Q_surface_net : ndarray (ny, nx)
         Net energy flux into surface [W/m²] (boundary condition)
-    thermal_diffusivity : ndarray (ny, nx)
-        α = k/(ρ·cp) [m²/s]
-    rho_cp : ndarray (ny, nx)
-        Volumetric heat capacity ρ·cp [J/(m³·K)]
+    thermal_conductivity : ndarray (ny, nx, nz) or (ny, nx)
+        Thermal conductivity k [W/(m·K)]
+        If 3D: depth-varying properties
+        If 2D: uniform with depth (backward compatible)
+    density : ndarray (ny, nx, nz) or (ny, nx)
+        Density ρ [kg/m³]
+    specific_heat : ndarray (ny, nx, nz) or (ny, nx)
+        Specific heat cp [J/(kg·K)]
     subsurface_grid : SubsurfaceGrid
         Vertical grid specification
     dt : float
@@ -379,9 +386,17 @@ def solve_subsurface_tridiagonal(
     T_new : ndarray (ny, nx, nz)
         Subsurface temperatures at new time step [K]
         T_new[:,:,0] is the updated surface temperature
+
+    Notes
+    -----
+    For depth-varying properties, uses harmonic mean for interface conductivity:
+    k_interface = 2 * k1 * k2 / (k1 + k2)
     """
     ny, nx, nz = T_prev.shape
     T_new = np.zeros_like(T_prev)
+
+    # Check if properties are depth-varying (3D) or uniform (2D)
+    depth_varying = (thermal_conductivity.ndim == 3)
 
     # Grid spacing
     dz = subsurface_grid.dz
@@ -389,10 +404,25 @@ def solve_subsurface_tridiagonal(
     # Solve at each horizontal location
     for j in range(ny):
         for i in range(nx):
-            alpha = thermal_diffusivity[j, i]
-            rho_cp_val = rho_cp[j, i]
             T_old = T_prev[j, i, :]
             Q_net = Q_surface_net[j, i]
+
+            # Extract material properties for this column
+            if depth_varying:
+                # Depth-varying: extract full depth profile
+                k = thermal_conductivity[j, i, :]
+                rho = density[j, i, :]
+                cp = specific_heat[j, i, :]
+                alpha = k / (rho * cp)  # Thermal diffusivity at each depth
+                rho_cp = rho * cp  # Volumetric heat capacity at each depth
+            else:
+                # Uniform: broadcast scalar to all depths
+                k_val = thermal_conductivity[j, i]
+                rho_val = density[j, i]
+                cp_val = specific_heat[j, i]
+                alpha = np.full(nz, k_val / (rho_val * cp_val))
+                rho_cp = np.full(nz, rho_val * cp_val)
+                k = np.full(nz, k_val)
 
             # Build tridiagonal system: A·T_new = d
             # Using Crank-Nicolson with von Neumann BC at surface (layer 0)
@@ -422,7 +452,14 @@ def solve_subsurface_tridiagonal(
             if nz > 1:
                 # Interface distance between nodes 0 and 1
                 dz_interface = dz[0]
-                r_01 = alpha / dz_interface**2
+                # Use harmonic mean for interface conductivity if depth-varying
+                if depth_varying:
+                    k_interface_01 = 2 * k[0] * k[1] / (k[0] + k[1])
+                    alpha_interface_01 = k_interface_01 / rho_cp[0]
+                else:
+                    alpha_interface_01 = alpha[0]
+
+                r_01 = alpha_interface_01 / dz_interface**2
 
                 # Collect terms for T^{n+1}:
                 # ρ·cp·dz[0]/dt * T[0]^{n+1} - θ*k/dz[0] * T[0]^{n+1} + θ*k/dz[0] * T[1]^{n+1} = ...
@@ -436,45 +473,67 @@ def solve_subsurface_tridiagonal(
 
                 # RHS: explicit conduction + old temperature + flux source
                 explicit_flux = (1 - theta) * dt * r_01 / dz[0] * (T_old[1] - T_old[0])
-                flux_source = dt * Q_net / (rho_cp_val * dz[0])
+                flux_source = dt * Q_net / (rho_cp[0] * dz[0])
 
                 d[0] = T_old[0] + explicit_flux + flux_source
             else:
                 # Single layer case - direct flux application
                 b[0] = 1.0
-                flux_source = dt * Q_net / (rho_cp_val * dz[0])
+                flux_source = dt * Q_net / (rho_cp[0] * dz[0])
                 d[0] = T_old[0] + flux_source
 
-            # Interior layers (k=1 to nz-2)
-            for k in range(1, nz - 1):
+            # Interior layers (k_idx=1 to nz-2)
+            for k_idx in range(1, nz - 1):
                 # Interface distances
-                dz_km1 = dz[k-1]
-                dz_kp1 = dz[k]
-                r_minus = alpha / dz_km1**2
-                r_plus = alpha / dz_kp1**2
+                dz_km1 = dz[k_idx-1]
+                dz_kp1 = dz[k_idx]
 
-                a[k] = -theta * dt * r_minus / dz[k]
-                c[k] = -theta * dt * r_plus / dz[k]
-                b[k] = 1.0 - a[k] - c[k]
+                # Compute interface diffusivities with harmonic mean for depth-varying
+                if depth_varying:
+                    # Interface between k-1 and k
+                    k_interface_minus = 2 * k[k_idx-1] * k[k_idx] / (k[k_idx-1] + k[k_idx])
+                    alpha_minus = k_interface_minus / rho_cp[k_idx]
+
+                    # Interface between k and k+1
+                    k_interface_plus = 2 * k[k_idx] * k[k_idx+1] / (k[k_idx] + k[k_idx+1])
+                    alpha_plus = k_interface_plus / rho_cp[k_idx]
+                else:
+                    alpha_minus = alpha[k_idx]
+                    alpha_plus = alpha[k_idx]
+
+                r_minus = alpha_minus / dz_km1**2
+                r_plus = alpha_plus / dz_kp1**2
+
+                a[k_idx] = -theta * dt * r_minus / dz[k_idx]
+                c[k_idx] = -theta * dt * r_plus / dz[k_idx]
+                b[k_idx] = 1.0 - a[k_idx] - c[k_idx]
 
                 # RHS from old time level
-                d[k] = T_old[k] + (1 - theta) * dt * (
-                    r_plus / dz[k] * (T_old[k+1] - T_old[k]) -
-                    r_minus / dz[k] * (T_old[k] - T_old[k-1])
+                d[k_idx] = T_old[k_idx] + (1 - theta) * dt * (
+                    r_plus / dz[k_idx] * (T_old[k_idx+1] - T_old[k_idx]) -
+                    r_minus / dz[k_idx] * (T_old[k_idx] - T_old[k_idx-1])
                 )
 
-            # Last layer (k=nz-1): Neumann BC at bottom (zero flux)
+            # Last layer (k_idx=nz-1): Neumann BC at bottom (zero flux)
             if nz > 1:
-                k = nz - 1
-                dz_km1 = dz[k-1]
-                r_minus = alpha / dz_km1**2
+                k_idx = nz - 1
+                dz_km1 = dz[k_idx-1]
 
-                a[k] = -theta * dt * r_minus / dz[k]
-                c[k] = 0.0  # No flux at bottom
-                b[k] = 1.0 - a[k]
+                # Interface diffusivity
+                if depth_varying:
+                    k_interface_minus = 2 * k[k_idx-1] * k[k_idx] / (k[k_idx-1] + k[k_idx])
+                    alpha_minus = k_interface_minus / rho_cp[k_idx]
+                else:
+                    alpha_minus = alpha[k_idx]
 
-                d[k] = T_old[k] + (1 - theta) * dt * (
-                    -r_minus / dz[k] * (T_old[k] - T_old[k-1])
+                r_minus = alpha_minus / dz_km1**2
+
+                a[k_idx] = -theta * dt * r_minus / dz[k_idx]
+                c[k_idx] = 0.0  # No flux at bottom
+                b[k_idx] = 1.0 - a[k_idx]
+
+                d[k_idx] = T_old[k_idx] + (1 - theta) * dt * (
+                    -r_minus / dz[k_idx] * (T_old[k_idx] - T_old[k_idx-1])
                 )
 
             # Solve tridiagonal system using Thomas algorithm
@@ -783,26 +842,35 @@ class ThermalSolver:
         # Get net flux into surface (this is our von Neumann BC)
         Q_net = fluxes['Q_net']
 
-        # Get thermal properties (use surface layer values)
-        k_thermal = self.materials.k[:, :, 0]
-        rho = self.materials.rho[:, :, 0]
-        cp = self.materials.cp[:, :, 0]
-        rho_cp = rho * cp
-        alpha = k_thermal / rho_cp
+        # Get thermal properties (pass full 3D arrays for depth-varying support)
+        # The solver will automatically detect if properties are 2D or 3D
+        k_thermal = self.materials.k  # (ny, nx, nz) or (ny, nx)
+        rho = self.materials.rho      # (ny, nx, nz) or (ny, nx)
+        cp = self.materials.cp        # (ny, nx, nz) or (ny, nx)
 
         # Solve subsurface with flux BC
         # This computes the new surface temperature (layer 0) and all subsurface temps
+        # Supports both uniform (2D) and depth-varying (3D) material properties
         T_sub_new = solve_subsurface_tridiagonal(
-            T_sub_old, Q_net, alpha, rho_cp,
+            T_sub_old, Q_net, k_thermal, rho, cp,
             self.subsurface_grid, self.dt
         )
 
         # Apply lateral conduction at surface (if enabled)
         # CRITICAL: Applied AFTER vertical solve to preserve energy conservation
         if self.enable_lateral_conduction:
+            # Compute surface thermal diffusivity for lateral conduction
+            # Extract surface layer properties (layer 0)
+            if k_thermal.ndim == 3:
+                # Depth-varying: use surface layer
+                alpha_surface = k_thermal[:, :, 0] / (rho[:, :, 0] * cp[:, :, 0])
+            else:
+                # Uniform: compute from 2D arrays
+                alpha_surface = k_thermal / (rho * cp)
+
             T_surf_after_lateral = apply_lateral_diffusion(
                 T_surface=T_sub_new[:, :, 0],  # Use NEW surface temp after vertical solve
-                thermal_diffusivity=alpha,
+                thermal_diffusivity=alpha_surface,
                 dx=self.terrain.dx,
                 dy=self.terrain.dy,
                 dt=self.dt,

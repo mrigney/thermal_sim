@@ -1,0 +1,79 @@
+# Demo configuration for Lunar Regolith Analog material
+#
+# This example demonstrates extreme low thermal conductivity
+# materials with depth-varying properties based on Apollo
+# mission data. Perfect for lunar surface simulations.
+#
+# To run: python main.py configs/examples/lunar_regolith_demo.yaml
+
+simulation:
+  name: "lunar_regolith_demo"
+  start_time: "2024-06-21T06:00:00"
+  duration_hours: 48  # Two full days to see thermal lag
+  time_step: 1800  # 30 minutes (seconds)
+
+site:
+  latitude: 0.0  # Lunar equator
+  longitude: 0.0
+  altitude: 0.0  # Lunar mean radius
+  timezone_offset: 0.0
+
+terrain:
+  type: "flat"
+  nx: 15
+  ny: 15
+  dx: 5.0  # 5 meter spacing (smaller for lunar surface)
+  dy: 5.0
+  flat_elevation: 0.0
+
+materials:
+  type: "uniform"
+  default_material: "Lunar Regolith Analog"
+
+  # SQLite database options
+  use_sqlite_database: true
+  sqlite_database_path: "data/materials/materials.db"
+
+atmosphere:
+  # Extreme lunar temperature cycle
+  temperature:
+    model: "diurnal"
+    mean_kelvin: 250.0  # -23 C mean (harsh lunar conditions)
+    amplitude_kelvin: 100.0  # ±100 C variation (extreme!)
+
+  # No wind on the Moon (set to minimal)
+  wind:
+    model: "diurnal"
+    mean_speed: 0.0  # No atmosphere
+    amplitude: 0.0
+
+  sky_temperature_model: "simple"  # Space background ~3K
+
+subsurface:
+  z_max: 0.3  # 30 cm depth (shallower for lunar regolith)
+  n_layers: 25  # Very fine resolution for low conductivity
+  stretch_factor: 1.15  # Gentle stretching
+
+solver:
+  enable_lateral_conduction: false
+  lateral_conductivity_factor: 1.0
+  shadow_timestep_minutes: 60.0
+
+initial_conditions:
+  type: "uniform"
+  temperature_kelvin: 250.0
+
+output:
+  directory: "output/lunar_regolith_demo"
+  save_interval_seconds: 3600.0  # Save hourly
+  save_temperature_fields: true
+  save_energy_diagnostics: true
+
+  # Visualization options
+  generate_plots: true
+  plot_format: "png"
+  plot_dpi: 150
+  plot_types:
+    - "surface_temperature"
+    - "diagnostics_timeseries"
+    - "hourly_summary"

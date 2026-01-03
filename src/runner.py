@@ -23,7 +23,8 @@ import matplotlib.pyplot as plt
 
 from src.config import ThermalSimConfig
 from src.terrain import TerrainGrid, create_synthetic_terrain
-from src.materials import MaterialField, MaterialDatabase, MaterialProperties, create_representative_materials
+from src.materials import MaterialField, MaterialFieldDepthVarying, MaterialDatabase, MaterialProperties, create_representative_materials
+from src.materials_db import MaterialDatabaseSQLite
 from src.atmosphere import AtmosphericConditions, create_diurnal_temperature, create_diurnal_wind
 from src.solar import ShadowCache
 from src.solver import ThermalSolver, SubsurfaceGrid, TemperatureField
@@ -57,11 +58,11 @@ class SimulationRunner:
 
         # Setup components
         self._setup_terrain()
+        self._setup_subsurface_grid()  # MOVED UP - must be before materials for depth interpolation
         self._setup_materials()
         self._setup_objects()  # Load 3D objects (if any)
         self._setup_atmosphere()
         self._setup_shadow_cache()
-        self._setup_subsurface_grid()
         self._setup_solver()
         self._setup_initial_conditions()
         self._setup_output()
@@ -118,61 +119,94 @@ class SimulationRunner:
         if self.verbose:
             print(f"  - Setting up materials ({self.config.materials.type})...")
 
-        # Load or create material database
-        mat_db_path = Path('data/materials/representative_materials.json')
-        if mat_db_path.exists():
-            # Load from file if it exists
-            mat_db = MaterialDatabase()
-            mat_db.load_from_json(str(mat_db_path))
-        else:
-            # Create representative database
-            mat_db = create_representative_materials()
-
-        # Add custom materials if provided
-        for i, custom_mat in enumerate(self.config.materials.custom_materials):
-            # Assign unique class_id starting from 100 to avoid conflicts
-            mat_db.add_material(MaterialProperties(
-                class_id=100 + i,
-                name=custom_mat['name'],
-                k=custom_mat['conductivity'],
-                rho=custom_mat['density'],
-                cp=custom_mat['specific_heat'],
-                alpha=custom_mat.get('absorptivity', 0.9),
-                epsilon=custom_mat.get('emissivity', 0.9),
-                roughness=custom_mat.get('roughness', 0.01)
-            ))
-
-        # Helper to find material class_id by name (case-insensitive)
-        def find_material_by_name(name: str) -> int:
-            """Find material class_id by name"""
-            name_lower = name.lower()
-            for class_id, mat in mat_db.materials.items():
-                if mat.name.lower() == name_lower:
-                    return class_id
-            # If not found, raise error
-            available = [m.name for m in mat_db.materials.values()]
-            raise ValueError(f"Material '{name}' not found. Available: {available}")
-
-        # Create material field
+        # Get grid dimensions
         ny, nx = self.terrain.ny, self.terrain.nx
-        nz = self.config.subsurface.n_layers
-        self.materials = MaterialField(ny, nx, nz, mat_db)
+        nz = self.subsurface_grid.n_layers
 
-        if self.config.materials.type == "uniform":
-            # Uniform material across entire domain
-            material_name = self.config.materials.default_material
-            material_class_id = find_material_by_name(material_name)
+        # Check if using SQLite database or legacy JSON
+        if self.config.materials.use_sqlite_database:
+            # === SQLite Database Path ===
+            db_path = Path(self.config.materials.sqlite_database_path)
+            if not db_path.exists():
+                raise FileNotFoundError(f"SQLite database not found: {db_path}")
 
-            # Create uniform classification map
-            material_class = np.full((ny, nx), material_class_id, dtype=np.int32)
-            self.materials.assign_from_classification(material_class)
+            # Open SQLite database
+            mat_db = MaterialDatabaseSQLite(str(db_path))
 
-        elif self.config.materials.type == "from_classification":
-            # Load material classification from file
-            classification = np.load(self.config.materials.classification_file)
-            self.materials.assign_from_classification(classification)
+            # Create MaterialFieldDepthVarying (supports depth-varying properties)
+            self.materials = MaterialFieldDepthVarying(ny, nx, nz, mat_db)
+
+            if self.config.materials.type == "uniform":
+                # Uniform material across entire domain (by name)
+                material_name = self.config.materials.default_material
+
+                # Create uniform classification map (use material names for SQLite)
+                material_class = np.full((ny, nx), material_name, dtype=object)
+                self.materials.assign_from_classification(material_class, self.subsurface_grid)
+
+            elif self.config.materials.type == "from_classification":
+                # Load material classification from file (names, not IDs)
+                classification = np.load(self.config.materials.classification_file)
+                self.materials.assign_from_classification(classification, self.subsurface_grid)
+            else:
+                raise ValueError(f"Unknown materials type: {self.config.materials.type}")
+
+            mat_db.close()
+
         else:
-            raise ValueError(f"Unknown materials type: {self.config.materials.type}")
+            # === Legacy JSON Path ===
+            mat_db_path = Path('data/materials/representative_materials.json')
+            if mat_db_path.exists():
+                # Load from file if it exists
+                mat_db = MaterialDatabase()
+                mat_db.load_from_json(str(mat_db_path))
+            else:
+                # Create representative database
+                mat_db = create_representative_materials()
+
+            # Add custom materials if provided
+            for i, custom_mat in enumerate(self.config.materials.custom_materials):
+                # Assign unique class_id starting from 100 to avoid conflicts
+                mat_db.add_material(MaterialProperties(
+                    class_id=100 + i,
+                    name=custom_mat['name'],
+                    k=custom_mat['conductivity'],
+                    rho=custom_mat['density'],
+                    cp=custom_mat['specific_heat'],
+                    alpha=custom_mat.get('absorptivity', 0.9),
+                    epsilon=custom_mat.get('emissivity', 0.9),
+                    roughness=custom_mat.get('roughness', 0.01)
+                ))
+
+            # Helper to find material class_id by name (case-insensitive)
+            def find_material_by_name(name: str) -> int:
+                """Find material class_id by name"""
+                name_lower = name.lower()
+                for class_id, mat in mat_db.materials.items():
+                    if mat.name.lower() == name_lower:
+                        return class_id
+                # If not found, raise error
+                available = [m.name for m in mat_db.materials.values()]
+                raise ValueError(f"Material '{name}' not found. Available: {available}")
+
+            # Create material field (legacy, uniform depth)
+            self.materials = MaterialField(ny, nx, nz, mat_db)
+
+            if self.config.materials.type == "uniform":
+                # Uniform material across entire domain
+                material_name = self.config.materials.default_material
+                material_class_id = find_material_by_name(material_name)
+
+                # Create uniform classification map
+                material_class = np.full((ny, nx), material_class_id, dtype=np.int32)
+                self.materials.assign_from_classification(material_class)
+
+            elif self.config.materials.type == "from_classification":
+                # Load material classification from file
+                classification = np.load(self.config.materials.classification_file)
+                self.materials.assign_from_classification(classification)
+            else:
+                raise ValueError(f"Unknown materials type: {self.config.materials.type}")
 
     def _setup_objects(self):
         """Load 3D thermal objects from configuration"""

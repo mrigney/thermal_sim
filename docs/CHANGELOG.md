@@ -7,6 +7,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Depth-Varying Materials with SQLite Database (Jan 3, 2026)
+- **SQLite materials database** with depth-varying thermal properties
+  - New module [src/materials_db.py](src/materials_db.py) - Complete SQLite database interface
+  - `MaterialDatabaseSQLite` class with full CRUD operations
+  - `MaterialPropertiesDepth` dataclass for materials with properties varying with depth
+  - Five-table schema: materials, thermal_properties, radiative_properties, surface_properties, spectral_emissivity
+  - Material versioning with UUIDs and `supersedes` tracking
+  - Scientific provenance: source_database, source_citation, notes fields
+  - Created database: [data/materials/materials.db](data/materials/materials.db) (64 KB, 9 materials)
+- **Depth-varying solver integration**
+  - Modified [src/solver.py](src/solver.py) `solve_subsurface_tridiagonal()` to handle 2D and 3D property arrays
+    - Automatic detection of array dimensionality (uniform vs depth-varying)
+    - Harmonic mean for interface thermal conductivity: `k_interface = 2·k₁·k₂/(k₁+k₂)`
+    - Full backward compatibility with existing uniform materials
+  - Updated `ThermalSolver.step()` to pass full 3D arrays for k, ρ, cp
+  - New class `MaterialFieldDepthVarying` in [src/materials.py](src/materials.py)
+    - Linear interpolation from database depths to subsurface grid depths
+    - Creates 3D arrays (ny, nx, nz) for depth-varying properties
+    - Fallback to uniform depth for legacy materials
+- **Configuration system updates**
+  - Added SQLite options to `MaterialsConfig` in [src/config.py](src/config.py):
+    - `use_sqlite_database: bool = False` (opt-in, default is legacy JSON)
+    - `sqlite_database_path: str = "data/materials/materials.db"`
+  - Updated [src/runner.py](src/runner.py) with dual-path materials setup:
+    - SQLite path: Uses `MaterialFieldDepthVarying` with depth interpolation
+    - JSON path: Uses legacy `MaterialField` (unchanged behavior)
+    - Fixed initialization order: subsurface grid created before materials
+- **Materials database** - 9 materials total:
+  - **6 legacy materials** (migrated from JSON as single-depth entries):
+    - Dry Sand, Granite, Basalt, Dry Soil, Sandstone, Gravel
+  - **3 depth-varying materials** with scientific citations:
+    - **Desert Sand (Depth-Varying)** - Presley & Christensen (1997)
+      - k: 0.30 → 0.50 W/(m·K) from surface to 0.5m depth
+      - Represents natural compaction gradient
+      - Thermal inertia (surface): 620 J/(m²·K·s^0.5)
+    - **Basalt (Weathered to Fresh)** - Christensen (1986)
+      - k: 1.5 → 2.0 W/(m·K) from surface to 0.05m depth
+      - Represents weathering profile from fractured surface to fresh bedrock
+      - Thermal inertia (surface): 1844 J/(m²·K·s^0.5)
+    - **Lunar Regolith Analog** - Cremers (1975) Apollo data
+      - k: 0.01 → 0.03 W/(m·K) from surface to 0.3m depth
+      - Extreme low conductivity for lunar surface simulations
+      - Thermal inertia (surface): 106 J/(m²·K·s^0.5)
+- **Database creation tool**
+  - New script [scripts/create_materials_database.py](scripts/create_materials_database.py)
+  - Populates database with legacy + depth-varying materials
+  - Command-line interface with `--output` and `--overwrite` options
+  - Comprehensive output showing all materials, sources, and thermal properties
+- **Example configurations** for depth-varying materials:
+  - [configs/examples/depth_varying_demo.yaml](configs/examples/depth_varying_demo.yaml) - Desert Sand simulation
+  - [configs/examples/legacy_materials_demo.yaml](configs/examples/legacy_materials_demo.yaml) - Legacy comparison
+  - [configs/examples/lunar_regolith_demo.yaml](configs/examples/lunar_regolith_demo.yaml) - Lunar surface
+- **Comprehensive testing**
+  - [test_materials_db_quick.py](test_materials_db_quick.py) - Database CRUD and interpolation tests
+  - [test_materialfield_depth.py](test_materialfield_depth.py) - MaterialFieldDepthVarying class tests
+  - [test_solver_depth_varying.py](test_solver_depth_varying.py) - Full integration test (48 timesteps)
+  - All tests passing, verified depth interpolation (5 database points → 20 grid layers)
+- **Documentation**
+  - Updated [docs/materials_database.md](docs/materials_database.md) - 583 lines
+    - Complete database schema documentation
+    - Python API reference with examples
+    - All 9 materials with full specifications
+    - Solver integration guide
+    - YAML configuration examples
+    - Performance considerations
+    - Backward compatibility details
+  - New [scripts/README.md](scripts/README.md) - Database tool documentation
+  - New [docs/DEPTH_VARYING_IMPLEMENTATION.md](docs/DEPTH_VARYING_IMPLEMENTATION.md) - Implementation summary
+  - Updated [README.md](README.md) - Added depth-varying materials to features list
+
+### Technical Details - Depth-Varying Materials
+- **Interpolation**: Linear interpolation between database depth points
+- **Extrapolation**: Constant extrapolation beyond defined depth range
+- **Interface conductivity**: Harmonic mean ensures heat flux continuity across layers
+- **Performance impact**: <5% slower, ~3× memory overhead (3D vs 2D arrays)
+- **Grid compatibility**: Automatic interpolation to any subsurface grid resolution
+- **Backward compatibility**: Full - legacy JSON materials work unchanged (default)
+
+### Test Results - Depth-Varying Materials
+- ✅ Integration test: 24-hour simulation completed successfully
+- ✅ Properties interpolated: 5 database depths → 20 grid layers
+- ✅ k range verified: 0.301 to 0.493 W/(m·K) across depth
+- ✅ Stable thermal evolution with physically plausible results
+- ✅ Performance: 0.9 steps/s (56 seconds for 48 timesteps)
+
 ### Added - Automatic Visualization (Dec 22, 2025)
 - **Optional automatic plot generation** during simulation
   - New visualization options in [src/config.py](src/config.py) `OutputConfig`
