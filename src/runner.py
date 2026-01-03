@@ -289,6 +289,22 @@ class SimulationRunner:
             if self.verbose:
                 print(f"    Loaded '{obj_config.name}': {thermal_obj.faces.shape[0]} faces, material={material.name}")
 
+        # Initialize object subsurface grids (if objects were loaded)
+        if self.objects and self.subsurface_grid is not None:
+            if self.verbose:
+                print(f"  - Initializing subsurface grids for {len(self.objects)} object(s)...")
+
+            from src.object_thermal import initialize_object_subsurface
+
+            for obj in self.objects:
+                initialize_object_subsurface(
+                    obj,
+                    nz=self.subsurface_grid.n_layers,
+                    z_max=max(self.subsurface_grid.z_max, obj.thickness * 2)  # At least 2x object thickness
+                )
+                if self.verbose:
+                    print(f"    Initialized '{obj.name}': {obj.T_subsurface.shape[0]} faces × {obj.T_subsurface.shape[1]} layers")
+
     def _setup_atmosphere(self):
         """Initialize atmospheric conditions from configuration"""
         if self.verbose:
@@ -452,7 +468,8 @@ class SimulationRunner:
             subsurface_grid=self.subsurface_grid,
             dt=self.config.simulation.dt,
             enable_lateral_conduction=self.config.solver.enable_lateral_conduction,
-            lateral_conductivity_factor=self.config.solver.lateral_conductivity_factor
+            lateral_conductivity_factor=self.config.solver.lateral_conductivity_factor,
+            objects=self.objects
         )
 
     def _setup_initial_conditions(self):
@@ -554,6 +571,12 @@ class SimulationRunner:
         if self.config.output.generate_plots:
             (self.output_dir / "plots").mkdir(exist_ok=True)
 
+        # Create objects directory if we have objects
+        if self.objects:
+            (self.output_dir / "objects").mkdir(exist_ok=True)
+            for obj in self.objects:
+                (self.output_dir / "objects" / obj.name).mkdir(exist_ok=True)
+
         # Initialize diagnostics log
         self.diagnostics = []
 
@@ -652,6 +675,25 @@ class SimulationRunner:
                 step=temp_field.step_number
             )
 
+            # Save object temperatures if objects are present
+            if self.objects:
+                for obj in self.objects:
+                    obj_dir = self.output_dir / "objects" / obj.name
+
+                    # Save face surface temperatures
+                    np.save(obj_dir / f"face_temperature_{timestamp}.npy",
+                            obj.T_surface.astype(np.float32))
+
+                    # Save subsurface temperatures if computed
+                    if hasattr(obj, 'T_subsurface') and obj.T_subsurface is not None:
+                        np.save(obj_dir / f"subsurface_temperature_{timestamp}.npy",
+                                obj.T_subsurface.astype(np.float32))
+
+                    # Save solar flux per face if available
+                    if hasattr(obj, 'solar_flux') and obj.solar_flux is not None:
+                        np.save(obj_dir / f"face_solar_flux_{timestamp}.npy",
+                                obj.solar_flux.astype(np.float32))
+
         if self.config.output.save_energy_diagnostics:
             # Compute energy diagnostics
             T_mean = np.mean(temp_field.T_surface)
@@ -693,13 +735,23 @@ class SimulationRunner:
         timestamp = self.current_time.strftime("%Y%m%d_%H%M%S")
         checkpoint_file = self.output_dir / "checkpoints" / f"checkpoint_{timestamp}.npz"
 
-        np.savez_compressed(
-            checkpoint_file,
-            T_surface=temp_field.T_surface,
-            T_subsurface=temp_field.T_subsurface,
-            time=self.current_time.isoformat(),
-            step=temp_field.step_number
-        )
+        # Save terrain checkpoint
+        checkpoint_data = {
+            'T_surface': temp_field.T_surface,
+            'T_subsurface': temp_field.T_subsurface,
+            'time': self.current_time.isoformat(),
+            'step': temp_field.step_number
+        }
+
+        # Add object temperatures to checkpoint if available
+        if self.objects:
+            for i, obj in enumerate(self.objects):
+                checkpoint_data[f'object_{i}_name'] = obj.name
+                checkpoint_data[f'object_{i}_T_surface'] = obj.T_surface
+                if hasattr(obj, 'T_subsurface') and obj.T_subsurface is not None:
+                    checkpoint_data[f'object_{i}_T_subsurface'] = obj.T_subsurface
+
+        np.savez_compressed(checkpoint_file, **checkpoint_data)
 
         if self.verbose:
             print(f"  [Checkpoint saved: {checkpoint_file.name}]")

@@ -721,6 +721,8 @@ class ThermalSolver:
     lateral_conductivity_factor : float, optional
         Multiplier for lateral thermal conductivity (default: 1.0)
         Values < 1.0 model anisotropic materials with reduced lateral conduction
+    objects : list, optional
+        List of 3D objects to include in thermal simulation (default: None)
     """
 
     def __init__(self,
@@ -735,7 +737,8 @@ class ThermalSolver:
                  subsurface_grid: Optional[SubsurfaceGrid] = None,
                  dt: float = 120.0,
                  enable_lateral_conduction: bool = False,
-                 lateral_conductivity_factor: float = 1.0):
+                 lateral_conductivity_factor: float = 1.0,
+                 objects: Optional[list] = None):
 
         self.terrain = terrain
         self.materials = materials
@@ -748,6 +751,7 @@ class ThermalSolver:
         self.dt = dt
         self.enable_lateral_conduction = enable_lateral_conduction
         self.lateral_conductivity_factor = lateral_conductivity_factor
+        self.objects = objects if objects is not None else []
 
         # Create subsurface grid if not provided
         if subsurface_grid is None:
@@ -887,6 +891,20 @@ class ThermalSolver:
         self.temp_field.T_subsurface = T_sub_new
         self.temp_field.time = current_time
         self.temp_field.step_number += 1
+
+        # Solve object thermal evolution (if objects are present)
+        if self.objects:
+            from src.object_thermal import compute_object_solar_flux, solve_object_thermal_1d
+
+            # Get wind speed for convection
+            wind_speed = self.atmosphere.get_wind_speed(current_time)
+
+            for obj in self.objects:
+                # Compute solar heating on each object face
+                compute_object_solar_flux(obj, azimuth, elevation, I_direct, I_diffuse)
+
+                # Solve 1D heat equation through object thickness for all faces
+                solve_object_thermal_1d(obj, self.dt, T_air, T_sky, wind_speed)
 
         return self.temp_field
 
