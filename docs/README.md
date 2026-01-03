@@ -1,109 +1,191 @@
-# Thermal Terrain Simulator
+# Thermal Terrain Simulator - Documentation
 
-A high-fidelity thermal simulation tool for computing spatially-resolved surface and subsurface temperatures on natural terrain, designed for infrared scene generation applications.
+Complete documentation for the thermal terrain simulation framework with depth-varying materials, solar irradiance, and object integration.
 
-## Overview
+## Quick Navigation
 
-This simulator solves the coupled surface energy balance and subsurface heat diffusion equations to predict temperature distributions across terrain with complex topography. It accounts for:
+### For New Users
+Start here if you're new to the simulator:
 
-- Solar radiation (direct and diffuse) with shadowing
-- Atmospheric longwave radiation
-- Surface thermal emission
-- Convective heat transfer
-- Vertical heat conduction into subsurface
-- Lateral surface heat conduction
-- Material property variations
+1. **[Setup Guide](user-guide/SETUP_GUIDE.md)** - Installation and first run
+2. **[Configuration Guide](user-guide/configuration.md)** - YAML configuration reference
+3. **[Materials Database](user-guide/materials_database.md)** - Material properties and database usage
+4. **[Object Thermal Guide](user-guide/OBJECT_THERMAL_GUIDE.md)** - Adding thermal objects to simulations
+5. **[Object Quick Reference](user-guide/OBJECT_QUICK_REFERENCE.md)** - Fast reference for object configuration
 
-## Features
+### For Developers
+Technical documentation and implementation details:
 
-- Multi-day simulation capability with diurnal cycles
-- High-resolution terrain support (0.1m grid spacing)
-- Multiple material types with spatially-varying properties
-- Pre-computed shadow caching for efficiency
-- GPU acceleration via CuPy
-- Semi-implicit time stepping for stability
+- **[Testing Guide](development/TESTING.md)** - Running and writing tests
+- **[Testing Summary](development/TESTING_SUMMARY.md)** - Test coverage and results
+- **[Visualization Development](development/VISUALIZATION_README.md)** - Plot generation tools
 
-## Installation
+### Technical Documentation
+Deep dives into algorithms and physics:
 
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+- **[Solar Algorithms](technical/SOLAR_ALGORITHMS.md)** - Solar position, irradiance, and shadow computation
+- **[Atmosphere Algorithms](technical/ATMOSPHERE_ALGORITHMS.md)** - Atmospheric temperature, wind, and sky radiation models
+- **[Shadow Optimization](technical/SHADOW_OPTIMIZATION.md)** - Shadow cache system and performance
+- **[Enhanced Visualization Guide](technical/ENHANCED_VISUALIZATION_GUIDE.md)** - Advanced plotting capabilities
 
-# Install dependencies
-pip install -r requirements.txt
-```
+### Project Management
+Track project status and changes:
 
-Note: CuPy requires CUDA toolkit. Adjust the CuPy version in requirements.txt based on your CUDA version.
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and feature additions
+- **[Project Status](project_status.md)** - Current implementation status and roadmap
 
-## Project Structure
+## Documentation Structure
 
 ```
-thermal_terrain_sim/
-├── src/                    # Source code
-│   ├── terrain.py         # Terrain geometry and properties
-│   ├── materials.py       # Material property management
-│   ├── solar.py           # Solar radiation and shadows
-│   ├── atmosphere.py      # Atmospheric conditions
-│   ├── solver.py          # Heat equation solver
-│   ├── io_utils.py        # File I/O utilities
-│   └── kernels.py         # GPU kernel implementations
-├── data/                   # Input data files
-│   ├── dem/               # Digital elevation models
-│   ├── materials/         # Material property databases
-│   └── weather/           # Atmospheric forcing data
-├── outputs/               # Simulation outputs
-├── tests/                 # Unit tests
-├── notebooks/             # Jupyter notebooks for analysis
-└── examples/              # Example scripts
+docs/
+├── README.md                          # This file - navigation guide
+├── CHANGELOG.md                       # Version history
+├── project_status.md                  # Project status and roadmap
+│
+├── user-guide/                        # End-user documentation
+│   ├── SETUP_GUIDE.md                # Installation and first run
+│   ├── configuration.md              # YAML configuration reference
+│   ├── materials_database.md         # Materials database guide
+│   ├── OBJECT_THERMAL_GUIDE.md       # Object integration guide
+│   └── OBJECT_QUICK_REFERENCE.md     # Object configuration quick ref
+│
+├── technical/                         # Technical algorithm documentation
+│   ├── SOLAR_ALGORITHMS.md           # Solar radiation calculations
+│   ├── ATMOSPHERE_ALGORITHMS.md      # Atmospheric models
+│   ├── SHADOW_OPTIMIZATION.md        # Shadow computation
+│   └── ENHANCED_VISUALIZATION_GUIDE.md  # Advanced visualization
+│
+├── development/                       # Developer documentation
+│   ├── TESTING.md                    # Testing guide
+│   ├── TESTING_SUMMARY.md            # Test results
+│   └── VISUALIZATION_README.md       # Visualization development
+│
+└── archive/                           # Historical documentation
+    ├── implementation-notes/          # Completed implementation docs
+    ├── bugfixes/                      # Bug fix documentation
+    ├── discussions/                   # Design discussions
+    └── daily-logs/                    # Development logs
 ```
 
-## Quick Start
+## Key Features
 
-See `examples/` directory for example simulation scripts.
+### Depth-Varying Materials
+The simulator supports materials with thermal properties (k, ρ, cp) that vary with depth:
+- SQLite database with scientific citations
+- Automatic interpolation to solver grid
+- 9 materials including lunar regolith, desert sand, and basalt
+- See [materials_database.md](user-guide/materials_database.md)
 
-## Physics Background
+### Solar Radiation & Shadows
+High-fidelity solar irradiance with shadow computation:
+- Möller-Trumbore ray-triangle intersection
+- Configurable shadow cache for performance
+- Direct, diffuse, and reflected radiation
+- See [SOLAR_ALGORITHMS.md](technical/SOLAR_ALGORITHMS.md)
+
+### Thermal Objects
+Add 3D objects to terrain simulations:
+- Ground clamping for automatic placement
+- Object-terrain and object-object shadows
+- Thermal integration with subsurface solver
+- See [OBJECT_THERMAL_GUIDE.md](user-guide/OBJECT_THERMAL_GUIDE.md)
+
+### Atmospheric Models
+Realistic atmospheric conditions:
+- Diurnal temperature and wind cycles
+- Multiple sky temperature models (Idso, Prata, Swinbank, Simple)
+- Humidity and cloud cover support
+- See [ATMOSPHERE_ALGORITHMS.md](technical/ATMOSPHERE_ALGORITHMS.md)
+
+## Common Workflows
+
+### Running Your First Simulation
+
+1. Install dependencies: See [SETUP_GUIDE.md](user-guide/SETUP_GUIDE.md)
+2. Choose a demo configuration from `configs/examples/`:
+   - `depth_varying_demo.yaml` - Depth-varying materials
+   - `lunar_regolith_demo.yaml` - Lunar surface simulation
+   - `legacy_materials_demo.yaml` - Uniform materials
+3. Run: `python main.py configs/examples/depth_varying_demo.yaml`
+4. Check output in `output/depth_varying_demo/`
+
+### Configuring Materials
+
+**Uniform materials (legacy JSON):**
+```yaml
+materials:
+  type: "uniform"
+  default_material: "Dry Sand"
+  use_sqlite_database: false
+```
+
+**Depth-varying materials (SQLite):**
+```yaml
+materials:
+  type: "uniform"
+  default_material: "Desert Sand (Depth-Varying)"
+  use_sqlite_database: true
+  sqlite_database_path: "data/materials/materials.db"
+```
+
+See [configuration.md](user-guide/configuration.md) for full reference.
+
+### Adding Objects
+
+```yaml
+objects:
+  - name: "boulder"
+    mesh_file: "data/objects/boulder.obj"
+    position: [50.0, 50.0, null]  # null = auto ground clamp
+    material: "Granite"
+```
+
+See [OBJECT_QUICK_REFERENCE.md](user-guide/OBJECT_QUICK_REFERENCE.md) for details.
+
+## Physics Implementation
 
 ### Surface Energy Balance
 ```
-ρc_p ∂T/∂t = Q_solar + Q_atmospheric + Q_emission + Q_convection + Q_conduction
+ρcp ∂T/∂t = Q_solar + Q_atmospheric + Q_emission + Q_convection + Q_conduction
 ```
 
-### Subsurface Heat Equation (1D at each surface point)
+### Subsurface Heat Equation
 ```
-ρc_p ∂T/∂t = ∂/∂z(k ∂T/∂z)
+ρcp ∂T/∂t = ∂/∂z[k(z) ∂T/∂z]
 ```
+- Depth-varying thermal conductivity k(z)
+- Crank-Nicolson implicit solver
+- Harmonic mean for interface conductivity
 
-### Lateral Surface Conduction
+### Lateral Conduction
 ```
 ∂T/∂t = α ∇²T
 ```
+- Optional lateral heat transfer
+- Coupled with vertical diffusion
 
-## Development Status
+See [technical/](technical/) folder for detailed algorithm documentation.
 
-**Phase 1 (Current):** Core physics implementation
-- [x] Project structure
-- [ ] Terrain module
-- [ ] Material properties
-- [ ] Solar radiation and shadows
-- [ ] Heat solver (surface + subsurface)
-- [ ] Basic validation cases
+## Archive
 
-**Phase 2 (Future):** Enhanced features
-- [ ] Terrain-to-terrain radiation
-- [ ] GPU optimization
-- [ ] Multi-GPU support
-- [ ] Advanced atmospheric models
+Historical implementation notes and completed work are in [archive/](archive/):
+- **[implementation-notes/](archive/implementation-notes/)** - Depth-varying materials, object integration, etc.
+- **[bugfixes/](archive/bugfixes/)** - Bug fix documentation
+- **[discussions/](archive/discussions/)** - Design discussions (e.g., materials database design)
+- **[daily-logs/](archive/daily-logs/)** - Development logs
 
-**Phase 3 (Future):** Extended capabilities
-- [ ] Vegetation modeling
-- [ ] Man-made objects
-- [ ] Advanced validation
+## Getting Help
 
-## License
+1. Check the appropriate guide above
+2. Review [CHANGELOG.md](CHANGELOG.md) for recent changes
+3. Check [project_status.md](project_status.md) for known issues
+4. Review archived implementation notes for specific features
 
-TBD
+## Contributing
 
-## Contact
-
-TBD
+When adding new features:
+1. Update relevant user-guide documentation
+2. Add technical documentation to technical/ if implementing new algorithms
+3. Update CHANGELOG.md
+4. Update project_status.md if affecting roadmap
+5. Add implementation notes to archive/ when complete
