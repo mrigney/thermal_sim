@@ -31,6 +31,47 @@ cmake ..
 cmake --build .
 ```
 
+### Installing
+
+The library builds as a shared library by default and can be installed system-wide:
+
+```bash
+# From build directory
+cmake --build . --target install
+
+# Or with custom install prefix
+cmake -DCMAKE_INSTALL_PREFIX=/opt/materials_db ..
+cmake --build .
+cmake --build . --target install
+```
+
+This installs:
+- **Shared library**: `libmaterials_db.so.1.0.0` (or `.dll`/`.dylib` on Windows/macOS)
+- **Headers**: All `.hpp` files from `include/` directory
+- **CMake config**: Package configuration for easy downstream use
+
+After installation, downstream projects can use:
+
+```cmake
+find_package(materials_database 1.0 REQUIRED)
+target_link_libraries(my_app PRIVATE materials::materials_database)
+```
+
+See [cmake/README.md](cmake/README.md) for detailed usage in downstream projects.
+
+### Build Options
+
+```bash
+# Build static library instead of shared
+cmake -DBUILD_SHARED_LIBS=OFF ..
+
+# Skip building examples
+cmake -DBUILD_EXAMPLES=OFF ..
+
+# Enable tests (if available)
+cmake -DBUILD_TESTS=ON ..
+```
+
 ### Running the Examples
 
 ```bash
